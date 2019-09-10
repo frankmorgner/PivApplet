@@ -91,6 +91,7 @@ public class PivApplet extends Applet
 	/* YubicoPIV extensions we support. */
 	private static final byte INS_SET_MGMT = (byte)0xff;
 	private static final byte INS_IMPORT_ASYM = (byte)0xfe;
+	private static final byte INS_EXPORT_ASYM = (byte)0x11;
 	private static final byte INS_GET_VER = (byte)0xfd;
 	private static final byte INS_RESET = (byte)0xfb;
 	private static final byte INS_SET_PIN_RETRIES = (byte)0xfa;
@@ -113,6 +114,10 @@ public class PivApplet extends Applet
 
 	private SGList incoming = null;
 	private SGList outgoing = null;
+	private byte[] import9a = null;
+	private byte[] import9c = null;
+	private byte[] import9d = null;
+	private byte[] import9e = null;
 	private APDUStream apduStream = null;
 	private Buffer tempBuf = null;
 	private Buffer outBuf = null;
@@ -314,6 +319,10 @@ public class PivApplet extends Applet
 
 		incoming = new SGList();
 		outgoing = new SGList();
+		import9a = null;
+		import9c = null;
+		import9d = null;
+		import9e = null;
 		apduStream = new APDUStream();
 
 		tempBuf = new Buffer();
@@ -440,6 +449,9 @@ public class PivApplet extends Applet
 			break;
 		case INS_IMPORT_ASYM:
 			processImportAsym(apdu);
+			break;
+		case INS_EXPORT_ASYM:
+			processExportAsym(apdu);
 			break;
 		case INS_SET_MGMT:
 			processSetMgmtKey(apdu);
@@ -972,6 +984,27 @@ public class PivApplet extends Applet
 		if (!receiveChain(apdu))
 			return;
 
+		switch (key) {
+			case (byte)0x9A:
+				import9a = new byte[incoming.available()];
+				incoming.read(import9a, (short)0, incoming.available());
+				break;
+			case (byte)0x9C:
+				import9c = new byte[incoming.available()];
+				incoming.read(import9c, (short)0, incoming.available());
+				break;
+			case (byte)0x9D:
+				import9d = new byte[incoming.available()];
+				incoming.read(import9d, (short)0, incoming.available());
+				break;
+			case (byte)0x9E:
+				import9e = new byte[incoming.available()];
+				incoming.read(import9e, (short)0, incoming.available());
+				break;
+			default:
+				break;
+		}
+
 		tlv.start(incoming);
 
 		switch (alg) {
@@ -1216,6 +1249,35 @@ public class PivApplet extends Applet
 			ISOException.throwIt(ISO7816.SW_WRONG_DATA);
 			return;
 		}
+	}
+
+	private void
+	processExportAsym(APDU apdu)
+	{
+		final byte[] buffer = apdu.getBuffer();
+		final byte key;
+
+		key = buffer[ISO7816.OFFSET_P2];
+
+		outgoing.reset();
+		switch (key) {
+			case (byte)0x9A:
+				outgoing.append(import9a, (short)0, (short)import9a.length);
+				break;
+			case (byte)0x9C:
+				outgoing.append(import9c, (short)0, (short)import9c.length);
+				break;
+			case (byte)0x9D:
+				outgoing.append(import9d, (short)0, (short)import9d.length);
+				break;
+			case (byte)0x9E:
+				outgoing.append(import9e, (short)0, (short)import9e.length);
+				break;
+			default:
+				ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+				return;
+		}
+		sendOutgoing(apdu);
 	}
 
 	private void
